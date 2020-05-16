@@ -2,3 +2,4 @@
 .env
 Dockerfile
 package-lock.json
+~.ssh
