@@ -1,0 +1,68 @@
+pipeline {
+    agent any
+    stages {
+
+        // stage('Check in SCM') {
+        //     steps {
+        //         git 'https://github.com/exusiasoftware/nodejs-blog-test.git'
+        //         echo 'Download Complete...'
+        //     }
+        // }
+          
+        stage('Init') {
+            steps {
+              catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                sh 'docker stop mongodb'
+                sh 'docker rm mongodb'
+              }
+              sh 'docker run -d -p 27017:27017 --name mongodb mongo:4.4.10-rc0'
+            }
+        }
+                
+        stage('Docker Build') {
+            steps {
+                echo 'Building Docker file'
+                sh 'pwd'
+                sh 'docker build . -t nodejs-blog-test:${env.BUILD_ID}'
+            }
+        }
+        
+        stage('Deploy') {
+            steps {
+                echo 'Deploying in Staging Area'
+                sh  'docker run -d -p 3000:3000 --name nodejs-blog-test-build-${env.BUILD_ID} nodejs-blog-test:${env.BUILD_ID}'
+            }
+        }
+        
+
+        stage("Approval") {
+            steps {
+               input 'Approval Stage'
+            }
+        }
+        
+        stage("Publish and Remove Docker Image") {
+            steps {
+                echo 'Adding to the local Docker Repository'
+                sh 'docker tag nodejs-blog-test:${env.BUILD_ID} exusiasoftware/nodejs-blog-test:${env.BUILD_ID}'
+                //sh 'docker push exusiasoftware/nodejs-blog-test:${env.BUILD_ID}'
+                echo "Removing Docker Image"
+                sh 'docker stop nodejs-blog-test-build-${env.BUILD_ID}}'
+                sh 'docker rm nodejs-blog-test-build-${env.BUILD_ID}'
+                sh 'docker rmi nodejs-blog-test:${env.BUILD_ID}'
+            }
+        }
+    }
+
+    post{
+        always{
+            echo "========always========"
+        }
+        success{
+            echo "========pipeline executed successfully ========"
+        }
+        failure{
+            echo "========pipeline execution failed========"
+        }
+    }
+}
